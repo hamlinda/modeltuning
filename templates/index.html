@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hamlin Software | AI Model Tuner & Evaluator</title>
+
+    <!-- Modern Typography: Inter & Outfit from Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Link to our Custom Glassmorphic CSS Stylesheet -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+
+<body>
+    <!-- 
+      UI-TO-CODE ASSOCIATION MAP:
+      =============================================================================
+      Header: Controls local server state and light/dark theme toggles.
+      Left Panel: Data selection (Upload CSV, select sample datasets, train split slider, target y selector).
+      Middle Panel: Model hyperparameter tuning form and active feature checklist.
+      Right Panel: Run execution trigger, log console, performance metrics, and Chart.js outputs.
+      =============================================================================
+    -->
+
+    <!-- Dynamic Glassmorphic Navigation Header -->
+    <header class="app-header">
+        <div class="header-container">
+            <div class="brand">
+                <span class="logo-dot"></span>
+                <h1>HAMLIN SOFTWARE</h1>
+                <span class="brand-divider">/</span>
+                <span class="brand-subtitle">Model Tuner & Evaluator</span>
+            </div>
+            <div class="header-controls">
+                <div class="status-indicator">
+                    <span class="status-pulse" id="status-pulse"></span>
+                    <span class="status-text" id="status-text">Server: Idle</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <main class="app-workspace">
+        <div class="workspace-grid">
+
+            <!-- PANEL 1: DATA SOURCE & DATASET SETTING -->
+            <section class="panel glass" id="data-panel">
+                <div class="panel-header">
+                    <span class="panel-num">01</span>
+                    <h2>Dataset Configuration</h2>
+                </div>
+
+                <div class="panel-body">
+                    <!-- Dropzone/File Upload for Custom CSVs -->
+                    <div class="form-group">
+                        <label class="field-label">
+                            Upload CSV Dataset
+                            <span class="tooltip-container tooltip-right">
+                                <span class="tooltip-icon">?</span>
+                                <span class="tooltip-text">Upload a local comma-separated value (.csv) file. We parse it
+                                    entirely in-memory with a strict 5MB size limit.</span>
+                            </span>
+                        </label>
+                        <div class="file-dropzone" id="file-dropzone">
+                            <input type="file" id="csv-file-input" accept=".csv">
+                            <div class="dropzone-prompt">
+                                <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
+                                <p class="primary-prompt">Drag & Drop CSV file here</p>
+                                <p class="secondary-prompt">or click to browse local files (Max 5MB)</p>
+                            </div>
+                            <div class="dropzone-file-info hidden" id="dropzone-file-info">
+                                <span class="file-name" id="selected-file-name">filename.csv</span>
+                                <button type="button" class="btn-clear-file" id="btn-clear-file">&times;</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Separator / Quick Samples -->
+                    <div class="or-separator">
+                        <span>OR LOAD DEMO DATASET</span>
+                    </div>
+
+                    <div class="demo-buttons">
+                        <button type="button" class="btn btn-secondary" id="btn-demo-housing" data-type="housing">
+                            Housing Prices <span class="badge badge-reg">Reg</span>
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="btn-demo-churn" data-type="churn">
+                            Customer Churn <span class="badge badge-clf">Clf</span>
+                        </button>
+                    </div>
+
+                    <!-- Target Selection and Train Split Ratio -->
+                    <div class="data-settings-group disabled-state" id="data-settings-group">
+                        <div class="form-group mt-2">
+                            <label class="field-label" for="target-select">
+                                Target Variable (y)
+                                <span class="tooltip-container tooltip-right">
+                                    <span class="tooltip-icon">?</span>
+                                    <span class="tooltip-text">The column you want the AI model to learn to predict.
+                                        Selecting a column dynamically filters matching classification/regression
+                                        algorithms.</span>
+                                </span>
+                            </label>
+                            <select id="target-select" class="form-control">
+                                <option value="" disabled selected>Select target column...</option>
+                            </select>
+                            <small class="field-help">This is the variable the AI model will learn to predict.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="split-slider-header">
+                                <label class="field-label">
+                                    Train / Test Split
+                                    <span class="tooltip-container tooltip-right">
+                                        <span class="tooltip-icon">?</span>
+                                        <span class="tooltip-text">Splits dataset: Train set fits model parameters; Test
+                                            set is held out to compute final evaluation metrics.</span>
+                                    </span>
+                                </label>
+                                <span class="split-value" id="split-value-label">80% / 20%</span>
+                            </div>
+                            <input type="range" id="split-slider" min="50" max="95" value="80" class="range-slider">
+                            <small class="field-help">Percentage of data used for training vs testing.</small>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PANEL 2: MODEL SELECTION, HYPERPARAMETERS & FEATURES -->
+            <section class="panel glass disabled-state" id="config-panel">
+                <div class="panel-header">
+                    <span class="panel-num">02</span>
+                    <h2>Model & Features</h2>
+                </div>
+
+                <div class="panel-body">
+                    <!-- Model Selection -->
+                    <div class="form-group">
+                        <label class="field-label" for="model-select">
+                            Algorithm Selection
+                            <span class="tooltip-container tooltip-right">
+                                <span class="tooltip-icon">?</span>
+                                <span class="tooltip-text">Select the core ML model. Algorithms are grouped by task
+                                    (regression vs classification) based on the target column data type.</span>
+                            </span>
+                        </label>
+                        <select id="model-select" class="form-control">
+                            <option value="" disabled selected>Choose a model...</option>
+                            <optgroup label="Classification Models" id="model-optgroup-clf"></optgroup>
+                            <optgroup label="Regression Models" id="model-optgroup-reg"></optgroup>
+                        </select>
+                    </div>
+
+                    <!-- Hyperparameters dynamically generated by JS -->
+                    <div class="hyperparams-section hidden" id="hyperparams-section">
+                        <h3 class="section-title">Hyperparameter Tuning</h3>
+                        <div class="hyperparams-grid" id="hyperparams-container">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Features selection & Preprocessing Tuning -->
+                    <div class="features-section">
+                        <h3 class="section-title">Feature Configuration & Scaling</h3>
+                        <p class="section-subtitle">Fine-tune transforms for individual variables.</p>
+
+                        <div class="features-table-container">
+                            <table class="features-table">
+                                <thead>
+                                    <tr>
+                                        <th class="col-active">Use</th>
+                                        <th class="col-name">Feature Name</th>
+                                        <th class="col-type">Type</th>
+                                        <th class="col-transform">
+                                            Transformation
+                                            <span class="tooltip-container tooltip-left">
+                                                <span class="tooltip-icon">?</span>
+                                                <span class="tooltip-text">Standard (rescales to mean=0, std=1); MinMax
+                                                    (scales to 0-1 bounds); One-Hot (creates binary columns per
+                                                    category); Ordinal (maps categories to integers).</span>
+                                            </span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="features-table-body">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PANEL 3: PERFORMANCE RESULTS & CHARTS -->
+            <section class="panel glass" id="results-panel">
+                <div class="panel-header">
+                    <span class="panel-num">03</span>
+                    <h2>Results Dashboard</h2>
+                </div>
+
+                <div class="panel-body flex-col h-full">
+                    <!-- Large Glowing Trigger Button -->
+                    <button type="button" class="btn btn-primary btn-run disabled-state" id="btn-run-evaluation">
+                        <span class="btn-text">Execute Model Training</span>
+                        <span class="btn-glow"></span>
+                    </button>
+
+                    <!-- Run/Log Console -->
+                    <div class="console-box mt-3" id="console-box">
+                        <div class="console-header">
+                            <span class="console-title">Console Output Logs</span>
+                            <span class="console-dot-group">
+                                <span></span><span></span><span></span>
+                            </span>
+                        </div>
+                        <div class="console-log" id="console-log">
+                            <div class="log-line system-msg">> Standing by. Load a dataset to begin...</div>
+                        </div>
+                    </div>
+
+                    <!-- Metrics Display Cards Grid -->
+                    <div class="metrics-container mt-3 hidden" id="metrics-container">
+                        <h3 class="section-title">Performance Metrics</h3>
+                        <div class="metrics-grid" id="metrics-grid">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Charts Grid Display -->
+                    <div class="charts-container mt-3 hidden" id="charts-container">
+                        <h3 class="section-title">Visual Evaluations</h3>
+
+                        <!-- Tabs to switch between evaluation charts -->
+                        <div class="chart-tabs">
+                            <button class="chart-tab active" data-target="chart-primary-wrapper" id="tab-primary">Model
+                                Fit</button>
+                            <button class="chart-tab" data-target="chart-secondary-wrapper" id="tab-secondary">Feature
+                                Importance</button>
+                            <button class="chart-tab hidden" data-target="chart-tertiary-wrapper"
+                                id="tab-tertiary">Confusion Matrix</button>
+                        </div>
+
+                        <div class="charts-viewbox">
+                            <div class="chart-wrapper" id="chart-primary-wrapper">
+                                <canvas id="chart-primary"></canvas>
+                            </div>
+                            <div class="chart-wrapper hidden" id="chart-secondary-wrapper">
+                                <canvas id="chart-secondary"></canvas>
+                            </div>
+                            <div class="chart-wrapper hidden" id="chart-tertiary-wrapper">
+                                <!-- Customized Interactive Heatmap styled directly via CSS-Grid -->
+                                <div class="confusion-matrix-grid" id="confusion-matrix-grid">
+                                    <!-- Rendered dynamically by main.js using secure DOM APIs -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Error/Warning Floating Toast Notification -->
+    <div class="toast hidden" id="error-toast">
+        <div class="toast-content">
+            <span class="toast-icon">!</span>
+            <span class="toast-message" id="toast-message">An error occurred.</span>
+        </div>
+        <button class="toast-close" id="toast-close">&times;</button>
+    </div>
+
+    <!-- Local Chart.js copy loaded offline-friendly -->
+    <script src="/static/js/chart.umd.js"></script>
+
+    <!-- Core Application Controller Script -->
+    <script src="/static/js/main.js"></script>
+</body>
+
+</html>
