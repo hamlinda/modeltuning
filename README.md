@@ -49,9 +49,14 @@ graph TD
 - Python 3.12+ (Tested on Python 3.14)
 
 ### One-Click Setup & Launch
-A unified setup script is provided to automatically handle dependency checking, virtual environment creation, user-space fallback (on systems with PEP 668 restrictions), and launching the application in a single step:
+A unified setup script automatically checks dependencies, creates virtual environments (or falls back to user-space configuration if needed), and runs the application in the background (saving output to `app.log` and process ID to `.app.pid`):
 ```bash
 ./setup.sh
+```
+
+To stop the background application, run:
+```bash
+./shutdown.sh
 ```
 
 ### Standard Manual Setup
@@ -66,6 +71,7 @@ pip install --break-system-packages -r requirements.txt
 ```
 
 ---
+
 
 ## Launch Rules & Connectivity Ports
 
