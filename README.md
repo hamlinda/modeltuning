@@ -43,14 +43,19 @@ graph TD
 
 ---
 
-## Installation Rules
+## Installation & Launch
 
 ### Prerequisites
 - Python 3.12+ (Tested on Python 3.14)
-- Pip package manager
 
-### Standard Setup
-Install the scanned, verified dependencies:
+### One-Click Setup & Launch
+A unified setup script is provided to automatically handle dependency checking, virtual environment creation, user-space fallback (on systems with PEP 668 restrictions), and launching the application in a single step:
+```bash
+./setup.sh
+```
+
+### Standard Manual Setup
+To install dependencies manually:
 ```bash
 pip install -r requirements.txt
 ```
@@ -64,10 +69,11 @@ pip install --break-system-packages -r requirements.txt
 
 ## Launch Rules & Connectivity Ports
 
-Launch the Flask development server from the workspace root:
+If you performed standard manual installation, launch the Flask development server from the workspace root:
 ```bash
 python3 app.py
 ```
+
 
 ### Connectivity Bindings
 To allow discoverability and management by locally connected systems on the subnet, the server binds to `0.0.0.0` (all network interfaces) on port `5000`:
