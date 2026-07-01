@@ -57,45 +57,85 @@ MODELS_SCHEMA = {
     "random_forest_classifier": {
         "name": "Random Forest Classifier",
         "type": "classification",
+        "experiences": {
+            "default": {"name": "Default / Balanced", "params": {"n_estimators": 100, "max_depth": 10, "min_samples_split": 2}, "description": "Provides a balanced configuration suitable for general-purpose baseline tuning."},
+            "fast": {"name": "Faster Process", "params": {"n_estimators": 10, "max_depth": 5, "min_samples_split": 5}, "description": "Optimizes parameters to reduce compute time and memory footprint, prioritizing speed over maximum accuracy."},
+            "accurate": {"name": "Highest Accuracy", "params": {"n_estimators": 500, "max_depth": 50, "min_samples_split": 2}, "description": "Maximizes model capacity and training duration to achieve the highest possible accuracy, regardless of compute cost."},
+            "repeatable": {"name": "Most Repeatable", "params": {"n_estimators": 100, "max_depth": 10, "min_samples_split": 10}, "description": "Increases regularization and simplifies the model structure to reduce variance and ensure consistent results across multiple runs."},
+            "volatile": {"name": "Most Unique/Volatile", "params": {"n_estimators": 50, "max_depth": 50, "min_samples_split": 2}, "description": "Reduces regularization and increases model complexity to capture unique, highly non-linear patterns, at the risk of overfitting."},
+            "multi_npu": {"name": "Multi-NPU support", "params": {"n_estimators": 500, "max_depth": 20, "min_samples_split": 2}, "description": "Scales up batch sizes and model capacity to fully utilize parallel compute environments with multiple NPUs."}
+        },
         "params": [
-            {"name": "n_estimators", "label": "Number of Trees", "type": "int", "default": 100, "min": 10, "max": 500, "step": 10, "description": "The number of trees in the forest. More trees increase accuracy and generalization but slow down training and prediction speed."},
-            {"name": "max_depth", "label": "Max Depth", "type": "int_or_none", "default": 10, "min": 1, "max": 50, "step": 1, "description": "The maximum depth of the individual trees. Deeper trees capture complex patterns but run a high risk of overfitting."},
-            {"name": "min_samples_split", "label": "Min Samples Split", "type": "int", "default": 2, "min": 2, "max": 20, "step": 1, "description": "The minimum number of samples required to split an internal node. Higher values act as regularization by preventing small, highly-specific leaves."}
+            {"name": "n_estimators", "label": "Number of Trees", "type": "int", "default": 100, "min": 10, "max": 500, "step": 10, "description": "The number of trees in the forest. More trees increase accuracy and generalization but slow down training and prediction speed. Use fewer trees for a faster process, or more trees if you have multi-NPU support to maximize accuracy."},
+            {"name": "max_depth", "label": "Max Depth", "type": "int_or_none", "default": 10, "min": 1, "max": 50, "step": 1, "description": "The maximum depth of the individual trees. Deeper trees capture complex patterns but run a high risk of overfitting and volatility. Shallow trees are more repeatable."},
+            {"name": "min_samples_split", "label": "Min Samples Split", "type": "int", "default": 2, "min": 2, "max": 20, "step": 1, "description": "The minimum number of samples required to split an internal node. Higher values act as regularization by preventing small, highly-specific leaves, leading to more repeatable results."}
         ]
     },
     "logistic_regression": {
         "name": "Logistic Regression",
         "type": "classification",
+        "experiences": {
+            "default": {"name": "Default / Balanced", "params": {"C": 1.0, "penalty": "l2", "solver": "lbfgs"}, "description": "Provides a balanced configuration suitable for general-purpose baseline tuning."},
+            "fast": {"name": "Faster Process", "params": {"C": 0.1, "penalty": "l2", "solver": "saga"}, "description": "Optimizes parameters to reduce compute time and memory footprint, prioritizing speed over maximum accuracy."},
+            "accurate": {"name": "Highest Accuracy", "params": {"C": 100.0, "penalty": "none", "solver": "lbfgs"}, "description": "Maximizes model capacity and training duration to achieve the highest possible accuracy, regardless of compute cost."},
+            "repeatable": {"name": "Most Repeatable", "params": {"C": 0.01, "penalty": "l2", "solver": "lbfgs"}, "description": "Increases regularization and simplifies the model structure to reduce variance and ensure consistent results across multiple runs."},
+            "volatile": {"name": "Most Unique/Volatile", "params": {"C": 100.0, "penalty": "none", "solver": "saga"}, "description": "Reduces regularization and increases model complexity to capture unique, highly non-linear patterns, at the risk of overfitting."},
+            "multi_npu": {"name": "Multi-NPU support", "params": {"C": 1.0, "penalty": "l2", "solver": "lbfgs"}, "description": "Scales up batch sizes and model capacity to fully utilize parallel compute environments with multiple NPUs."}
+        },
         "params": [
-            {"name": "C", "label": "Regularization Strength (C)", "type": "float", "default": 1.0, "min": 0.01, "max": 100.0, "step": 0.01, "description": "Inverse of regularization strength. Smaller values specify stronger regularization, which keeps weights small to prevent overfitting."},
-            {"name": "penalty", "label": "Penalty", "type": "choice", "default": "l2", "choices": ["l2", "none"], "description": "The type of norm regularization applied. L2 shrinks weights, while 'none' applies standard maximum likelihood estimation."},
-            {"name": "solver", "label": "Solver", "type": "choice", "default": "lbfgs", "choices": ["lbfgs", "liblinear", "saga"], "description": "Optimization algorithm used to solve for model weights. 'liblinear' is good for small data; 'saga' is faster for large datasets; 'lbfgs' is standard."}
+            {"name": "C", "label": "Regularization Strength (C)", "type": "float", "default": 1.0, "min": 0.01, "max": 100.0, "step": 0.01, "description": "Inverse of regularization strength. Smaller values specify stronger regularization, which keeps weights small to prevent overfitting (repeatable). Larger values fit the data more closely (volatile/highest accuracy)."},
+            {"name": "penalty", "label": "Penalty", "type": "choice", "default": "l2", "choices": ["l2", "none"], "description": "The type of norm regularization applied. L2 shrinks weights for repeatability, while 'none' applies standard maximum likelihood estimation for potentially higher accuracy but more volatility."},
+            {"name": "solver", "label": "Solver", "type": "choice", "default": "lbfgs", "choices": ["lbfgs", "liblinear", "saga"], "description": "Optimization algorithm used to solve for model weights. 'saga' is faster for large datasets; 'lbfgs' is standard and accurate."}
         ]
     },
     "svc": {
         "name": "Support Vector Classifier (SVC)",
         "type": "classification",
+        "experiences": {
+            "default": {"name": "Default / Balanced", "params": {"C": 1.0, "kernel": "rbf", "gamma": "scale"}, "description": "Provides a balanced configuration suitable for general-purpose baseline tuning."},
+            "fast": {"name": "Faster Process", "params": {"C": 1.0, "kernel": "linear", "gamma": "auto"}, "description": "Optimizes parameters to reduce compute time and memory footprint, prioritizing speed over maximum accuracy."},
+            "accurate": {"name": "Highest Accuracy", "params": {"C": 10.0, "kernel": "rbf", "gamma": "scale"}, "description": "Maximizes model capacity and training duration to achieve the highest possible accuracy, regardless of compute cost."},
+            "repeatable": {"name": "Most Repeatable", "params": {"C": 0.1, "kernel": "linear", "gamma": "scale"}, "description": "Increases regularization and simplifies the model structure to reduce variance and ensure consistent results across multiple runs."},
+            "volatile": {"name": "Most Unique/Volatile", "params": {"C": 100.0, "kernel": "poly", "gamma": "auto"}, "description": "Reduces regularization and increases model complexity to capture unique, highly non-linear patterns, at the risk of overfitting."},
+            "multi_npu": {"name": "Multi-NPU support", "params": {"C": 10.0, "kernel": "rbf", "gamma": "scale"}, "description": "Scales up batch sizes and model capacity to fully utilize parallel compute environments with multiple NPUs."}
+        },
         "params": [
-            {"name": "C", "label": "Regularization Parameter (C)", "type": "float", "default": 1.0, "min": 0.01, "max": 100.0, "step": 0.01, "description": "Regularization parameter. Margin trade-off: larger values try to classify all training points correctly (overfitting risk), smaller values allow a wider margin (generalizes better)."},
-            {"name": "kernel", "label": "Kernel Type", "type": "choice", "default": "rbf", "choices": ["rbf", "linear", "poly", "sigmoid"], "description": "Determines how data is projected into high-dimensional space. 'linear' keeps it flat; 'rbf' maps non-linear circular shapes; 'poly' handles curves."},
-            {"name": "gamma", "label": "Gamma scale", "type": "choice", "default": "scale", "choices": ["scale", "auto"], "description": "Kernel coefficient for non-linear kernels. 'scale' uses 1/(n_features * X.var()), adjusting dynamically; 'auto' uses 1/n_features."}
+            {"name": "C", "label": "Regularization Parameter (C)", "type": "float", "default": 1.0, "min": 0.01, "max": 100.0, "step": 0.01, "description": "Regularization parameter. Margin trade-off: larger values try to classify all training points correctly (overfitting risk / volatile), smaller values allow a wider margin (generalizes better / repeatable)."},
+            {"name": "kernel", "label": "Kernel Type", "type": "choice", "default": "rbf", "choices": ["rbf", "linear", "poly", "sigmoid"], "description": "Determines how data is projected into high-dimensional space. 'linear' keeps it flat for faster processes; 'rbf' maps non-linear circular shapes for higher accuracy."},
+            {"name": "gamma", "label": "Gamma scale", "type": "choice", "default": "scale", "choices": ["scale", "auto"], "description": "Kernel coefficient for non-linear kernels. 'scale' adjusts dynamically to variance (repeatable); 'auto' uses 1/n_features."}
         ]
     },
     "decision_tree_classifier": {
         "name": "Decision Tree Classifier",
         "type": "classification",
+        "experiences": {
+            "default": {"name": "Default / Balanced", "params": {"criterion": "gini", "max_depth": 10}, "description": "Provides a balanced configuration suitable for general-purpose baseline tuning."},
+            "fast": {"name": "Faster Process", "params": {"criterion": "gini", "max_depth": 5}, "description": "Optimizes parameters to reduce compute time and memory footprint, prioritizing speed over maximum accuracy."},
+            "accurate": {"name": "Highest Accuracy", "params": {"criterion": "entropy", "max_depth": 50}, "description": "Maximizes model capacity and training duration to achieve the highest possible accuracy, regardless of compute cost."},
+            "repeatable": {"name": "Most Repeatable", "params": {"criterion": "gini", "max_depth": 3}, "description": "Increases regularization and simplifies the model structure to reduce variance and ensure consistent results across multiple runs."},
+            "volatile": {"name": "Most Unique/Volatile", "params": {"criterion": "entropy", "max_depth": 50}, "description": "Reduces regularization and increases model complexity to capture unique, highly non-linear patterns, at the risk of overfitting."},
+            "multi_npu": {"name": "Multi-NPU support", "params": {"criterion": "entropy", "max_depth": 50}, "description": "Scales up batch sizes and model capacity to fully utilize parallel compute environments with multiple NPUs."}
+        },
         "params": [
-            {"name": "criterion", "label": "Splitting Criterion", "type": "choice", "default": "gini", "choices": ["gini", "entropy", "log_loss"], "description": "Mathematical function measuring split quality. 'gini' measures general impurity; 'entropy' and 'log_loss' calculate information gain."},
-            {"name": "max_depth", "label": "Max Depth", "type": "int_or_none", "default": 10, "min": 1, "max": 50, "step": 1, "description": "The maximum depth of the decision tree. Deep trees memorize training data (overfit); shallow trees are fast and robust."}
+            {"name": "criterion", "label": "Splitting Criterion", "type": "choice", "default": "gini", "choices": ["gini", "entropy", "log_loss"], "description": "Mathematical function measuring split quality. 'gini' is faster to compute; 'entropy' can yield slightly higher accuracy by measuring information gain."},
+            {"name": "max_depth", "label": "Max Depth", "type": "int_or_none", "default": 10, "min": 1, "max": 50, "step": 1, "description": "The maximum depth of the decision tree. Deep trees memorize training data (volatile/accurate); shallow trees are fast and repeatable."}
         ]
     },
     "gradient_boosting_classifier": {
         "name": "Gradient Boosting Classifier",
         "type": "classification",
+        "experiences": {
+            "default": {"name": "Default / Balanced", "params": {"n_estimators": 100, "learning_rate": 0.1, "max_depth": 3}, "description": "Provides a balanced configuration suitable for general-purpose baseline tuning."},
+            "fast": {"name": "Faster Process", "params": {"n_estimators": 50, "learning_rate": 0.2, "max_depth": 2}, "description": "Optimizes parameters to reduce compute time and memory footprint, prioritizing speed over maximum accuracy."},
+            "accurate": {"name": "Highest Accuracy", "params": {"n_estimators": 300, "learning_rate": 0.05, "max_depth": 5}, "description": "Maximizes model capacity and training duration to achieve the highest possible accuracy, regardless of compute cost."},
+            "repeatable": {"name": "Most Repeatable", "params": {"n_estimators": 100, "learning_rate": 0.01, "max_depth": 2}, "description": "Increases regularization and simplifies the model structure to reduce variance and ensure consistent results across multiple runs."},
+            "volatile": {"name": "Most Unique/Volatile", "params": {"n_estimators": 300, "learning_rate": 1.0, "max_depth": 10}, "description": "Reduces regularization and increases model complexity to capture unique, highly non-linear patterns, at the risk of overfitting."},
+            "multi_npu": {"name": "Multi-NPU support", "params": {"n_estimators": 300, "learning_rate": 0.1, "max_depth": 5}, "description": "Scales up batch sizes and model capacity to fully utilize parallel compute environments with multiple NPUs."}
+        },
         "params": [
-            {"name": "n_estimators", "label": "Number of Estimators", "type": "int", "default": 100, "min": 10, "max": 300, "step": 10, "description": "Number of boosting stages (weak trees) to perform. Gradient boosting is robust to overfitting but too many trees will eventually overfit."},
-            {"name": "learning_rate", "label": "Learning Rate", "type": "float", "default": 0.1, "min": 0.01, "max": 1.0, "step": 0.01, "description": "Shrinkage factor of each weak tree's contribution. Smaller values require higher estimators for same fit, but lead to better generalization."},
-            {"name": "max_depth", "label": "Max Depth", "type": "int", "default": 3, "min": 1, "max": 15, "step": 1, "description": "Maximum depth of the individual regression trees. Limits the degree of interaction between features."}
+            {"name": "n_estimators", "label": "Number of Estimators", "type": "int", "default": 100, "min": 10, "max": 300, "step": 10, "description": "Number of boosting stages (weak trees) to perform. Higher estimators increase accuracy but slow down the process. Use fewer for a faster process."},
+            {"name": "learning_rate", "label": "Learning Rate", "type": "float", "default": 0.1, "min": 0.01, "max": 1.0, "step": 0.01, "description": "Shrinkage factor of each weak tree's contribution. Smaller values (repeatable/accurate) require higher estimators for same fit, larger values can be volatile."},
+            {"name": "max_depth", "label": "Max Depth", "type": "int", "default": 3, "min": 1, "max": 15, "step": 1, "description": "Maximum depth of the individual regression trees. Limits the degree of interaction between features. Keep low for repeatability."}
         ]
     },
 
@@ -103,42 +143,120 @@ MODELS_SCHEMA = {
     "linear_regression": {
         "name": "Linear Regression",
         "type": "regression",
+        "experiences": {
+            "default": {"name": "Default / Balanced", "params": {"fit_intercept": True}, "description": "Provides a balanced configuration suitable for general-purpose baseline tuning."},
+            "fast": {"name": "Faster Process", "params": {"fit_intercept": False}, "description": "Optimizes parameters to reduce compute time and memory footprint, prioritizing speed over maximum accuracy."},
+            "accurate": {"name": "Highest Accuracy", "params": {"fit_intercept": True}, "description": "Maximizes model capacity and training duration to achieve the highest possible accuracy, regardless of compute cost."},
+            "repeatable": {"name": "Most Repeatable", "params": {"fit_intercept": True}, "description": "Increases regularization and simplifies the model structure to reduce variance and ensure consistent results across multiple runs."},
+            "volatile": {"name": "Most Unique/Volatile", "params": {"fit_intercept": False}, "description": "Reduces regularization and increases model complexity to capture unique, highly non-linear patterns, at the risk of overfitting."},
+            "multi_npu": {"name": "Multi-NPU support", "params": {"fit_intercept": True}, "description": "Scales up batch sizes and model capacity to fully utilize parallel compute environments with multiple NPUs."}
+        },
         "params": [
-            {"name": "fit_intercept", "label": "Fit Intercept", "type": "bool", "default": True, "description": "Whether to calculate the constant intercept offset. Uncheck if your data is already centered around zero."}
+            {"name": "fit_intercept", "label": "Fit Intercept", "type": "bool", "default": True, "description": "Whether to calculate the constant intercept offset. Disabling it forces the line through the origin, which might be faster but highly volatile if data isn't centered."}
         ]
     },
     "ridge_regression": {
         "name": "Ridge Regression",
         "type": "regression",
+        "experiences": {
+            "default": {"name": "Default / Balanced", "params": {"alpha": 1.0}, "description": "Provides a balanced configuration suitable for general-purpose baseline tuning."},
+            "fast": {"name": "Faster Process", "params": {"alpha": 1.0}, "description": "Optimizes parameters to reduce compute time and memory footprint, prioritizing speed over maximum accuracy."},
+            "accurate": {"name": "Highest Accuracy", "params": {"alpha": 0.1}, "description": "Maximizes model capacity and training duration to achieve the highest possible accuracy, regardless of compute cost."},
+            "repeatable": {"name": "Most Repeatable", "params": {"alpha": 10.0}, "description": "Increases regularization and simplifies the model structure to reduce variance and ensure consistent results across multiple runs."},
+            "volatile": {"name": "Most Unique/Volatile", "params": {"alpha": 0.01}, "description": "Reduces regularization and increases model complexity to capture unique, highly non-linear patterns, at the risk of overfitting."},
+            "multi_npu": {"name": "Multi-NPU support", "params": {"alpha": 1.0}, "description": "Scales up batch sizes and model capacity to fully utilize parallel compute environments with multiple NPUs."}
+        },
         "params": [
-            {"name": "alpha", "label": "Regularization Strength (Alpha)", "type": "float", "default": 1.0, "min": 0.01, "max": 100.0, "step": 0.01, "description": "L2 regularization strength. Larger values force model weights closer to zero, reducing multicollinearity impact and overfitting."}
+            {"name": "alpha", "label": "Regularization Strength (Alpha)", "type": "float", "default": 1.0, "min": 0.01, "max": 100.0, "step": 0.01, "description": "L2 regularization strength. Larger values force model weights closer to zero, making it extremely repeatable. Smaller values aim for highest accuracy on training data."}
         ]
     },
     "random_forest_regressor": {
         "name": "Random Forest Regressor",
         "type": "regression",
+        "experiences": {
+            "default": {"name": "Default / Balanced", "params": {"n_estimators": 100, "max_depth": 10, "min_samples_split": 2}, "description": "Provides a balanced configuration suitable for general-purpose baseline tuning."},
+            "fast": {"name": "Faster Process", "params": {"n_estimators": 10, "max_depth": 5, "min_samples_split": 5}, "description": "Optimizes parameters to reduce compute time and memory footprint, prioritizing speed over maximum accuracy."},
+            "accurate": {"name": "Highest Accuracy", "params": {"n_estimators": 500, "max_depth": 50, "min_samples_split": 2}, "description": "Maximizes model capacity and training duration to achieve the highest possible accuracy, regardless of compute cost."},
+            "repeatable": {"name": "Most Repeatable", "params": {"n_estimators": 100, "max_depth": 10, "min_samples_split": 10}, "description": "Increases regularization and simplifies the model structure to reduce variance and ensure consistent results across multiple runs."},
+            "volatile": {"name": "Most Unique/Volatile", "params": {"n_estimators": 50, "max_depth": 50, "min_samples_split": 2}, "description": "Reduces regularization and increases model complexity to capture unique, highly non-linear patterns, at the risk of overfitting."},
+            "multi_npu": {"name": "Multi-NPU support", "params": {"n_estimators": 500, "max_depth": 20, "min_samples_split": 2}, "description": "Scales up batch sizes and model capacity to fully utilize parallel compute environments with multiple NPUs."}
+        },
         "params": [
-            {"name": "n_estimators", "label": "Number of Trees", "type": "int", "default": 100, "min": 10, "max": 500, "step": 10, "description": "Number of trees in the forest. A higher count yields smoother predictions but uses more RAM and compute time."},
-            {"name": "max_depth", "label": "Max Depth", "type": "int_or_none", "default": 10, "min": 1, "max": 50, "step": 1, "description": "Maximum depth of the trees. Deeper trees capture fine details but run a higher risk of model overfitting."},
-            {"name": "min_samples_split", "label": "Min Samples Split", "type": "int", "default": 2, "min": 2, "max": 20, "step": 1, "description": "Minimum samples needed to split an internal node. Acts as regularizer: higher values prevent modeling small-sample anomalies."}
+            {"name": "n_estimators", "label": "Number of Trees", "type": "int", "default": 100, "min": 10, "max": 500, "step": 10, "description": "Number of trees in the forest. A higher count yields smoother, accurate predictions but uses more RAM and compute time (benefits from multi-NPU)."},
+            {"name": "max_depth", "label": "Max Depth", "type": "int_or_none", "default": 10, "min": 1, "max": 50, "step": 1, "description": "Maximum depth of the trees. Deeper trees capture fine details for high accuracy but run a higher risk of model volatility (overfitting)."},
+            {"name": "min_samples_split", "label": "Min Samples Split", "type": "int", "default": 2, "min": 2, "max": 20, "step": 1, "description": "Minimum samples needed to split an internal node. Acts as regularizer: higher values prevent modeling small-sample anomalies, creating a repeatable process."}
         ]
     },
     "svr": {
         "name": "Support Vector Regressor (SVR)",
         "type": "regression",
+        "experiences": {
+            "default": {"name": "Default / Balanced", "params": {"C": 1.0, "kernel": "rbf", "gamma": "scale"}, "description": "Provides a balanced configuration suitable for general-purpose baseline tuning."},
+            "fast": {"name": "Faster Process", "params": {"C": 1.0, "kernel": "linear", "gamma": "auto"}, "description": "Optimizes parameters to reduce compute time and memory footprint, prioritizing speed over maximum accuracy."},
+            "accurate": {"name": "Highest Accuracy", "params": {"C": 10.0, "kernel": "rbf", "gamma": "scale"}, "description": "Maximizes model capacity and training duration to achieve the highest possible accuracy, regardless of compute cost."},
+            "repeatable": {"name": "Most Repeatable", "params": {"C": 0.1, "kernel": "linear", "gamma": "scale"}, "description": "Increases regularization and simplifies the model structure to reduce variance and ensure consistent results across multiple runs."},
+            "volatile": {"name": "Most Unique/Volatile", "params": {"C": 100.0, "kernel": "poly", "gamma": "auto"}, "description": "Reduces regularization and increases model complexity to capture unique, highly non-linear patterns, at the risk of overfitting."},
+            "multi_npu": {"name": "Multi-NPU support", "params": {"C": 10.0, "kernel": "rbf", "gamma": "scale"}, "description": "Scales up batch sizes and model capacity to fully utilize parallel compute environments with multiple NPUs."}
+        },
         "params": [
-            {"name": "C", "label": "Regularization Parameter (C)", "type": "float", "default": 1.0, "min": 0.01, "max": 100.0, "step": 0.01, "description": "Regularization parameter. Trade-off: larger values prioritize fitting all training samples closely (overfitting danger), smaller values allow softer boundaries."},
-            {"name": "kernel", "label": "Kernel Type", "type": "choice", "default": "rbf", "choices": ["rbf", "linear", "poly", "sigmoid"], "description": "Determines the high-dimensional projection algorithm. 'rbf' handles non-linear distributions; 'linear' is suitable for simple flat trends."},
-            {"name": "gamma", "label": "Gamma scale", "type": "choice", "default": "scale", "choices": ["scale", "auto"], "description": "Kernel scale parameter. Controls the range of influence of a single training point. 'scale' uses 1/(n_features * X.var()) and adapts to variance."}
+            {"name": "C", "label": "Regularization Parameter (C)", "type": "float", "default": 1.0, "min": 0.01, "max": 100.0, "step": 0.01, "description": "Regularization parameter. Trade-off: larger values prioritize fitting all training samples closely (highest accuracy/volatile danger), smaller values allow softer boundaries (repeatable)."},
+            {"name": "kernel", "label": "Kernel Type", "type": "choice", "default": "rbf", "choices": ["rbf", "linear", "poly", "sigmoid"], "description": "Determines the high-dimensional projection algorithm. 'rbf' handles non-linear distributions (accurate); 'linear' is suitable for simple flat trends (faster)."},
+            {"name": "gamma", "label": "Gamma scale", "type": "choice", "default": "scale", "choices": ["scale", "auto"], "description": "Kernel scale parameter. Controls the range of influence of a single training point. 'scale' adapts to variance for repeatability."}
         ]
     },
     "gradient_boosting_regressor": {
         "name": "Gradient Boosting Regressor",
         "type": "regression",
+        "experiences": {
+            "default": {"name": "Default / Balanced", "params": {"n_estimators": 100, "learning_rate": 0.1, "max_depth": 3}, "description": "Provides a balanced configuration suitable for general-purpose baseline tuning."},
+            "fast": {"name": "Faster Process", "params": {"n_estimators": 50, "learning_rate": 0.2, "max_depth": 2}, "description": "Optimizes parameters to reduce compute time and memory footprint, prioritizing speed over maximum accuracy."},
+            "accurate": {"name": "Highest Accuracy", "params": {"n_estimators": 300, "learning_rate": 0.05, "max_depth": 5}, "description": "Maximizes model capacity and training duration to achieve the highest possible accuracy, regardless of compute cost."},
+            "repeatable": {"name": "Most Repeatable", "params": {"n_estimators": 100, "learning_rate": 0.01, "max_depth": 2}, "description": "Increases regularization and simplifies the model structure to reduce variance and ensure consistent results across multiple runs."},
+            "volatile": {"name": "Most Unique/Volatile", "params": {"n_estimators": 300, "learning_rate": 1.0, "max_depth": 10}, "description": "Reduces regularization and increases model complexity to capture unique, highly non-linear patterns, at the risk of overfitting."},
+            "multi_npu": {"name": "Multi-NPU support", "params": {"n_estimators": 300, "learning_rate": 0.1, "max_depth": 5}, "description": "Scales up batch sizes and model capacity to fully utilize parallel compute environments with multiple NPUs."}
+        },
         "params": [
-            {"name": "n_estimators", "label": "Number of Estimators", "type": "int", "default": 100, "min": 10, "max": 300, "step": 10, "description": "Number of sequential trees to fit. Higher numbers improve fit quality but extend execution times."},
-            {"name": "learning_rate", "label": "Learning Rate", "type": "float", "default": 0.1, "min": 0.01, "max": 1.0, "step": 0.01, "description": "Shrinkage factor scaling each tree's output. Best practice is to lower learning rate and raise estimators to reduce overfitting."},
-            {"name": "max_depth", "label": "Max Depth", "type": "int", "default": 3, "min": 1, "max": 15, "step": 1, "description": "Maximum depth of the individual regression trees. Restricts the number of interaction terms modeled."}
+            {"name": "n_estimators", "label": "Number of Estimators", "type": "int", "default": 100, "min": 10, "max": 300, "step": 10, "description": "Number of sequential trees to fit. Higher numbers improve fit quality (highest accuracy) but extend execution times (slower)."},
+            {"name": "learning_rate", "label": "Learning Rate", "type": "float", "default": 0.1, "min": 0.01, "max": 1.0, "step": 0.01, "description": "Shrinkage factor scaling each tree's output. Best practice for repeatability is to lower learning rate and raise estimators. High values are volatile."},
+            {"name": "max_depth", "label": "Max Depth", "type": "int", "default": 3, "min": 1, "max": 15, "step": 1, "description": "Maximum depth of the individual regression trees. Restricts the number of interaction terms modeled. Lower for repeatable, higher for volatile details."}
+        ]
+    },
+    
+    # COMPUTER VISION MODELS
+    "resnet50_finetune": {
+        "name": "ResNet-50 (Transfer Learning)",
+        "type": "cv",
+        "experiences": {
+            "default": {"name": "Default / Balanced", "params": {"batch_size": "32", "learning_rate": 0.001, "epochs": 10}, "description": "Provides a balanced configuration suitable for general-purpose baseline tuning."},
+            "fast": {"name": "Faster Process", "params": {"batch_size": "64", "learning_rate": 0.01, "epochs": 3}, "description": "Optimizes parameters to reduce compute time and memory footprint, prioritizing speed over maximum accuracy."},
+            "accurate": {"name": "Highest Accuracy", "params": {"batch_size": "16", "learning_rate": 0.0001, "epochs": 50}, "description": "Maximizes model capacity and training duration to achieve the highest possible accuracy, regardless of compute cost."},
+            "repeatable": {"name": "Most Repeatable", "params": {"batch_size": "32", "learning_rate": 0.0005, "epochs": 10}, "description": "Increases regularization and simplifies the model structure to reduce variance and ensure consistent results across multiple runs."},
+            "volatile": {"name": "Most Unique/Volatile", "params": {"batch_size": "16", "learning_rate": 0.1, "epochs": 20}, "description": "Reduces regularization and increases model complexity to capture unique, highly non-linear patterns, at the risk of overfitting."},
+            "multi_npu": {"name": "Multi-NPU support", "params": {"batch_size": "128", "learning_rate": 0.001, "epochs": 30}, "description": "Scales up batch sizes and model capacity to fully utilize parallel compute environments with multiple NPUs."}
+        },
+        "params": [
+            {"name": "batch_size", "label": "Batch Size", "type": "choice", "default": "32", "choices": ["16", "32", "64", "128"], "description": "Number of images processed per gradient update. Large batch sizes are essential for Multi-NPU support, while small batches can lead to higher accuracy but a volatile, slower training process."},
+            {"name": "learning_rate", "label": "Learning Rate", "type": "float", "default": 0.001, "min": 0.0001, "max": 0.1, "step": 0.0001, "description": "Step size for optimizer. Transfer learning often requires smaller learning rates for highest accuracy and repeatability, while large rates are volatile and fast."},
+            {"name": "epochs", "label": "Epochs", "type": "int", "default": 10, "min": 1, "max": 100, "step": 1, "description": "Number of full passes over the training dataset. Fewer epochs mean a faster process, while more epochs push for the highest accuracy."}
+        ]
+    },
+    
+    # LLM MODELS
+    "llama3_lora": {
+        "name": "Llama 3 8B (LoRA Fine-Tune)",
+        "type": "llm",
+        "experiences": {
+            "default": {"name": "Default / Balanced", "params": {"lora_r": 8, "learning_rate": 0.0002, "epochs": 3}, "description": "Provides a balanced configuration suitable for general-purpose baseline tuning."},
+            "fast": {"name": "Faster Process", "params": {"lora_r": 2, "learning_rate": 0.001, "epochs": 1}, "description": "Optimizes parameters to reduce compute time and memory footprint, prioritizing speed over maximum accuracy."},
+            "accurate": {"name": "Highest Accuracy", "params": {"lora_r": 64, "learning_rate": 0.0001, "epochs": 10}, "description": "Maximizes model capacity and training duration to achieve the highest possible accuracy, regardless of compute cost."},
+            "repeatable": {"name": "Most Repeatable", "params": {"lora_r": 8, "learning_rate": 0.00005, "epochs": 3}, "description": "Increases regularization and simplifies the model structure to reduce variance and ensure consistent results across multiple runs."},
+            "volatile": {"name": "Most Unique/Volatile", "params": {"lora_r": 32, "learning_rate": 0.005, "epochs": 5}, "description": "Reduces regularization and increases model complexity to capture unique, highly non-linear patterns, at the risk of overfitting."},
+            "multi_npu": {"name": "Multi-NPU support", "params": {"lora_r": 64, "learning_rate": 0.0005, "epochs": 5}, "description": "Scales up batch sizes and model capacity to fully utilize parallel compute environments with multiple NPUs."}
+        },
+        "params": [
+            {"name": "lora_r", "label": "LoRA Rank (r)", "type": "int", "default": 8, "min": 2, "max": 64, "step": 2, "description": "Rank of the update matrices. Higher rank provides more capacity for the highest accuracy, but consumes significant memory (best with Multi-NPU). Low rank is faster and more repeatable."},
+            {"name": "learning_rate", "label": "Learning Rate", "type": "float", "default": 0.0002, "min": 0.00001, "max": 0.005, "step": 0.00005, "description": "Learning rate for the adapter weights. High learning rates train faster but are extremely volatile and can break the model."},
+            {"name": "epochs", "label": "Epochs", "type": "int", "default": 3, "min": 1, "max": 10, "step": 1, "description": "Passes over the instruction tuning dataset. Decrease for a faster process, increase for highest accuracy."}
         ]
     }
 }
@@ -227,6 +345,18 @@ def load_sample():
             "TechSupport": tech_support,
             "PaperlessBilling": paperless,
             "Churned": churn_labels
+        })
+    elif dataset_type == "cv_images":
+        # Mock CV Dataset
+        df = pd.DataFrame({
+            "ImageFile": [f"img_{i:04d}.jpg" for i in range(500)],
+            "Class": np.random.choice(["Cat", "Dog", "Bird"], 500)
+        })
+    elif dataset_type == "llm_text":
+        # Mock LLM Instruction Dataset
+        df = pd.DataFrame({
+            "Instruction": [f"Translate sentence {i} to French" for i in range(500)],
+            "Response": [f"Bonjour phrase {i}" for i in range(500)]
         })
     else:
         return jsonify({"error": "Unknown sample type"}), 400
@@ -393,6 +523,30 @@ def evaluate():
     model_spec = MODELS_SCHEMA.get(model_key)
     if not model_spec:
         return jsonify({"error": "Invalid model type selected."}), 400
+
+    if model_spec["type"] in ["cv", "llm"]:
+        # MOCK EXECUTION FOR CV/LLM
+        metrics = {
+            "Accuracy (Validation)": round(np.random.uniform(0.75, 0.95), 4),
+            "Loss (Final)": round(np.random.uniform(0.1, 0.5), 4)
+        }
+        if model_spec["type"] == "llm":
+            metrics["Perplexity"] = round(np.random.uniform(5.0, 15.0), 2)
+            
+        visualization_data = {
+            "training_curve": {
+                "epochs": list(range(1, 11)),
+                "loss": [round(val, 4) for val in np.linspace(2.5, 0.3, 10) + np.random.normal(0, 0.1, 10)]
+            }
+        }
+        
+        return jsonify({
+            "status": "success",
+            "model_type": model_spec["name"],
+            "metrics": metrics,
+            "visualization": visualization_data,
+            "simulated": True
+        })
 
     # Convert parameter values to proper types
     parsed_params = {}

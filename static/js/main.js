@@ -133,12 +133,12 @@ function setupEventListeners() {
     // Demo Datasets loading
     const demoHousing = document.getElementById("btn-demo-housing");
     const demoChurn = document.getElementById("btn-demo-churn");
-    if (demoHousing) {
-        demoHousing.addEventListener("click", () => loadSampleDataset("housing"));
-    }
-    if (demoChurn) {
-        demoChurn.addEventListener("click", () => loadSampleDataset("churn"));
-    }
+    const demoCV = document.getElementById("btn-demo-cv");
+    const demoLLM = document.getElementById("btn-demo-llm");
+    if (demoHousing) demoHousing.addEventListener("click", () => loadSampleDataset("housing"));
+    if (demoChurn) demoChurn.addEventListener("click", () => loadSampleDataset("churn"));
+    if (demoCV) demoCV.addEventListener("click", () => loadSampleDataset("cv_images"));
+    if (demoLLM) demoLLM.addEventListener("click", () => loadSampleDataset("llm_text"));
 
     // Target Column Dropdown Selection
     const targetSelect = document.getElementById("target-select");
@@ -184,6 +184,29 @@ function setupEventListeners() {
             });
         });
     });
+
+    // Tuning Modal Logic
+    const tuningLink = document.getElementById('tuning-guide-link');
+    const tuningModal = document.getElementById('tuning-modal');
+    const modalCloseBtn = document.getElementById('modal-close-btn');
+
+    if (tuningLink && tuningModal && modalCloseBtn) {
+        tuningLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            tuningModal.classList.add('active');
+        });
+
+        modalCloseBtn.addEventListener('click', () => {
+            tuningModal.classList.remove('active');
+        });
+
+        // Close on outside click
+        tuningModal.addEventListener('click', (e) => {
+            if (e.target === tuningModal) {
+                tuningModal.classList.remove('active');
+            }
+        });
+    }
 }
 
 // Setup Drag & Drop File Upload listeners
@@ -436,25 +459,31 @@ function populateTargetDropdown(columns) {
     });
 }
 
-// Populate the model options grouped by type (Clf/Reg)
+// Populate the model options grouped by type
 function populateModelDropdown(schema) {
     const clfGroup = document.getElementById("model-optgroup-clf");
     const regGroup = document.getElementById("model-optgroup-reg");
-    
-    if (!clfGroup || !regGroup) return;
+    const cvGroup = document.getElementById("model-optgroup-cv");
+    const llmGroup = document.getElementById("model-optgroup-llm");
 
-    clfGroup.replaceChildren();
-    regGroup.replaceChildren();
+    if (clfGroup) clfGroup.replaceChildren();
+    if (regGroup) regGroup.replaceChildren();
+    if (cvGroup) cvGroup.replaceChildren();
+    if (llmGroup) llmGroup.replaceChildren();
 
     Object.entries(schema).forEach(([key, model]) => {
         const option = document.createElement("option");
         option.value = key;
         option.textContent = model.name;
 
-        if (model.type === "classification") {
+        if (model.type === "classification" && clfGroup) {
             clfGroup.appendChild(option);
-        } else {
+        } else if (model.type === "regression" && regGroup) {
             regGroup.appendChild(option);
+        } else if (model.type === "cv" && cvGroup) {
+            cvGroup.appendChild(option);
+        } else if (model.type === "llm" && llmGroup) {
+            llmGroup.appendChild(option);
         }
     });
 }
@@ -466,11 +495,22 @@ function handleTargetSelection(targetName) {
     const selectedCol = appState.columns.find(c => c.name === targetName);
     if (!selectedCol) return;
 
-    appState.targetType = selectedCol.type;
-    logConsole(`Target column set to: ${targetName} (${selectedCol.type === "numerical" ? "Regression Task" : "Classification Task"})`, "system");
+    let taskName = selectedCol.type === "numerical" ? "Regression Task" : "Classification Task";
+    let internalTargetType = selectedCol.type;
+
+    if (targetName === "Class" && appState.datasetToken && appState.datasetToken.includes("cv_images")) {
+        taskName = "Computer Vision Task";
+        internalTargetType = "cv";
+    } else if (targetName === "Response" && appState.datasetToken && appState.datasetToken.includes("llm_text")) {
+        taskName = "LLM Fine-Tuning Task";
+        internalTargetType = "llm";
+    }
+
+    appState.targetType = internalTargetType;
+    logConsole(`Target column set to: ${targetName} (${taskName})`, "system");
 
     // Toggle corresponding model algorithm availability in dropdown to assist selection
-    updateModelOptions(selectedCol.type);
+    updateModelOptions(internalTargetType);
 
     // Build the features listing table
     populateFeaturesTable(appState.columns, targetName);
@@ -486,38 +526,46 @@ function updateModelOptions(targetType) {
 
     const clfGroup = document.getElementById("model-optgroup-clf");
     const regGroup = document.getElementById("model-optgroup-reg");
+    const cvGroup = document.getElementById("model-optgroup-cv");
+    const llmGroup = document.getElementById("model-optgroup-llm");
 
     // Enable all first
-    clfGroup.disabled = false;
-    regGroup.disabled = false;
+    if (clfGroup) clfGroup.disabled = false;
+    if (regGroup) regGroup.disabled = false;
+    if (cvGroup) cvGroup.disabled = false;
+    if (llmGroup) llmGroup.disabled = false;
 
     // Reset selection if changing tasks
     if (appState.activeModel) {
         const selectedModelType = appState.modelsSchema[appState.activeModel].type;
-        if ((targetType === "numerical" && selectedModelType === "classification") ||
-            (targetType === "categorical" && selectedModelType === "regression")) {
+        // 'categorical' maps to 'classification', 'numerical' to 'regression' for legacy models
+        let expectedTargetType = selectedModelType;
+        if (selectedModelType === "classification") expectedTargetType = "categorical";
+        if (selectedModelType === "regression") expectedTargetType = "numerical";
+        
+        if (targetType !== expectedTargetType) {
             modelSelect.value = "";
             appState.activeModel = null;
-            document.getElementById("hyperparams-section").classList.add("hidden");
-            document.getElementById("btn-run-evaluation").classList.add("disabled-state");
+            const hc = document.getElementById("hyperparams-section");
+            if (hc) hc.classList.add("hidden");
+            const runBtn = document.getElementById("btn-run-evaluation");
+            if (runBtn) runBtn.classList.add("disabled-state");
         }
     }
 
     // Disable non-matching group
-    if (targetType === "numerical") {
-        clfGroup.disabled = true;
-        // Recommend regression if empty
-        if (!modelSelect.value) {
-            modelSelect.value = "random_forest_regressor";
-            handleModelSelection("random_forest_regressor");
-        }
-    } else {
-        regGroup.disabled = true;
-        // Recommend classification if empty
-        if (!modelSelect.value) {
-            modelSelect.value = "random_forest_classifier";
-            handleModelSelection("random_forest_classifier");
-        }
+    if (clfGroup) clfGroup.disabled = (targetType !== "categorical");
+    if (regGroup) regGroup.disabled = (targetType !== "numerical");
+    if (cvGroup) cvGroup.disabled = (targetType !== "cv");
+    if (llmGroup) llmGroup.disabled = (targetType !== "llm");
+    
+    // Recommend a model
+    if (!modelSelect.value) {
+        if (targetType === "numerical") modelSelect.value = "random_forest_regressor";
+        if (targetType === "categorical") modelSelect.value = "random_forest_classifier";
+        if (targetType === "cv") modelSelect.value = "resnet50_finetune";
+        if (targetType === "llm") modelSelect.value = "llama3_lora";
+        if (modelSelect.value) handleModelSelection(modelSelect.value);
     }
 }
 
@@ -628,12 +676,99 @@ function handleModelSelection(modelKey) {
 
     // Dynamic hyperparameter form generation
     renderHyperparameters(modelKey);
+    renderExperiences(modelKey);
 
     // Show hyperparams panel
     document.getElementById("hyperparams-section").classList.remove("hidden");
 
     // Enable Run Trigger
     document.getElementById("btn-run-evaluation").classList.remove("disabled-state");
+}
+
+// Dynamic rendering of experience presets
+function renderExperiences(modelKey) {
+    const experienceSelect = document.getElementById("experience-select");
+    if (!experienceSelect) return;
+
+    experienceSelect.replaceChildren();
+
+    const schema = appState.modelsSchema[modelKey];
+    if (!schema || !schema.experiences) {
+        document.getElementById("experience-group").classList.add("hidden");
+        return;
+    }
+
+    document.getElementById("experience-group").classList.remove("hidden");
+    const descElement = document.getElementById("experience-description");
+    if (descElement) {
+        descElement.classList.add("hidden");
+        descElement.textContent = "";
+    }
+    
+    // Add default unselected option
+    const defaultOpt = document.createElement("option");
+    defaultOpt.value = "";
+    defaultOpt.disabled = true;
+    defaultOpt.selected = true;
+    defaultOpt.textContent = "Select an experience preset...";
+    experienceSelect.appendChild(defaultOpt);
+
+    Object.entries(schema.experiences).forEach(([expKey, expData]) => {
+        const opt = document.createElement("option");
+        opt.value = expKey;
+        opt.textContent = expData.name;
+        experienceSelect.appendChild(opt);
+    });
+
+    // Remove old listeners to avoid duplicates by replacing the node
+    const newSelect = experienceSelect.cloneNode(true);
+    experienceSelect.parentNode.replaceChild(newSelect, experienceSelect);
+    
+    newSelect.addEventListener("change", (e) => {
+        const expKey = e.target.value;
+        const expData = schema.experiences[expKey];
+        if (!expData) return;
+        
+        logConsole(`Applied experience preset: ${expData.name}`, "info");
+
+        const descElement = document.getElementById("experience-description");
+        if (descElement) {
+            // Extract the human-readable changes
+            const changedParams = [];
+            Object.entries(expData.params).forEach(([paramName, paramValue]) => {
+                const paramSchema = schema.params.find(p => p.name === paramName);
+                if (paramSchema) {
+                    changedParams.push(`${paramSchema.label} to ${paramValue}`);
+                }
+            });
+            
+            const changesText = changedParams.length > 0 
+                ? ` Adjusts settings: ${changedParams.join(", ")}.` 
+                : "";
+
+            descElement.textContent = (expData.description || "") + changesText;
+            descElement.classList.remove("hidden");
+            // Add a style to make it look decent
+            descElement.style.paddingTop = "0.5rem";
+            descElement.style.fontSize = "0.75rem";
+            descElement.style.color = "var(--text-muted)";
+            descElement.style.fontStyle = "italic";
+        }
+
+        // Update each hyperparameter input
+        Object.entries(expData.params).forEach(([paramName, paramValue]) => {
+            const input = document.getElementById(`param-${paramName}`);
+            if (input) {
+                if (input.type === "checkbox") {
+                    input.checked = paramValue;
+                } else {
+                    input.value = paramValue;
+                    // Trigger input event to update display labels (if any)
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+        });
+    });
 }
 
 // Dynamic construction of hyperparameter controls (sliders, drop downs, switches)
@@ -898,9 +1033,9 @@ function renderPrimaryVisualization(vis) {
         appState.primaryChart.destroy();
     }
 
-    const isClassification = appState.modelsSchema[appState.activeModel].type === "classification";
+    const modelType = appState.modelsSchema[appState.activeModel].type;
 
-    if (isClassification) {
+    if (modelType === "classification") {
         // Render ROC Curve
         const roc = vis.roc_curve;
         if (!roc) {
@@ -963,7 +1098,7 @@ function renderPrimaryVisualization(vis) {
                 }
             }
         });
-    } else {
+    } else if (modelType === "regression") {
         // Render Regression Scatter Plot (Predictions vs Actuals)
         const reg = vis.regression_results;
         if (!reg) return;
@@ -1008,6 +1143,48 @@ function renderPrimaryVisualization(vis) {
                     },
                     y: {
                         title: { display: true, text: "Predicted Values", color: "#9ca3af" },
+                        grid: { color: "rgba(255, 255, 255, 0.05)" },
+                        ticks: { color: "#9ca3af" }
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: "#f3f4f6" } }
+                }
+            }
+        });
+    } else if (modelType === "cv" || modelType === "llm") {
+        // Render Training Curve
+        const tc = vis.training_curve;
+        if (!tc) return;
+
+        appState.primaryChart = new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: tc.epochs,
+                datasets: [
+                    {
+                        label: "Training Loss",
+                        data: tc.loss,
+                        borderColor: "#8b5cf6",
+                        backgroundColor: "rgba(139, 92, 246, 0.1)",
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 2,
+                        pointRadius: 3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        title: { display: true, text: "Epoch", color: "#9ca3af" },
+                        grid: { color: "rgba(255, 255, 255, 0.05)" },
+                        ticks: { color: "#9ca3af" }
+                    },
+                    y: {
+                        title: { display: true, text: "Loss", color: "#9ca3af" },
                         grid: { color: "rgba(255, 255, 255, 0.05)" },
                         ticks: { color: "#9ca3af" }
                     }
