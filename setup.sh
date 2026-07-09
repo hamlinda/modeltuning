@@ -32,7 +32,7 @@ launch_app_background() {
         echo -e "${GREEN}${BOLD}✓ Application successfully started in the background (PID: $pid)!${NC}"
         echo -e "${GREEN}Server logs are redirected to: ${BOLD}app.log${NC}"
         echo ""
-        echo -e "${BOLD}${CYAN}Application link: http://127.0.0.1:5000${NC}"
+        echo -e "${BOLD}${CYAN}Application link: http://127.0.0.1:${SERVICE_PORT:-5000}${NC}"
         echo -e "${YELLOW}To stop the application, run: ./shutdown.sh${NC}"
         echo ""
         exit 0

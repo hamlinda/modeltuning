@@ -1,6 +1,17 @@
 import io
 import uuid
 import logging
+import os
+import re
+import sys
+import json
+import time
+import socket
+import signal
+import atexit
+import threading
+import urllib.request
+import urllib.error
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import numpy as np
@@ -28,6 +39,174 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 # Flask Application Setup
 # TODO(security): Binding to 0.0.0.0 (all interfaces) to allow local network discoverability and management, overriding standard loopback restriction.
 app = Flask(__name__)
+
+# ==============================================================================
+# REVERSE PROXY REGISTRATION & LIFECYCLE HOOKS
+# ==============================================================================
+
+_registered = False
+_unregistered = False
+
+def get_default_service_name():
+    try:
+        # Get current directory name
+        dir_path = os.path.dirname(os.path.abspath(__file__))
+        dir_name = os.path.basename(dir_path)
+        # Slugify: replace non-alphanumeric characters with hyphen, convert to lowercase
+        slug = re.sub(r'[^a-zA-Z0-9]+', '-', dir_name).strip('-').lower()
+        return slug if slug else "model-tuning"
+    except Exception:
+        return "model-tuning"
+
+def get_local_ip():
+    # Read environment variable
+    service_ip = os.environ.get("SERVICE_IP")
+    if service_ip:
+        return service_ip
+    
+    # Auto-detect using socket connect to LAN registry
+    registry_ip = os.environ.get("REGISTRY_IP", "10.0.0.192")
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # Try to connect to registry port 80 to see which interface routes there
+        s.connect((registry_ip, 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+        return local_ip
+    except Exception:
+        pass
+    
+    # Fallback to general route query
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("10.255.255.255", 1))
+        local_ip = s.getsockname()[0]
+        s.close()
+        return local_ip
+    except Exception:
+        pass
+    
+    # Fallback to hostname resolution
+    try:
+        hostname = socket.gethostname()
+        local_ip = socket.gethostbyname(hostname)
+        if not local_ip.startswith("127."):
+            return local_ip
+    except Exception:
+        pass
+    
+    return "127.0.0.1"
+
+def register_service():
+    global _registered
+    
+    registry_ip = os.environ.get("REGISTRY_IP", "10.0.0.192")
+    service_name = os.environ.get("SERVICE_NAME", get_default_service_name())
+    service_ip = get_local_ip()
+    service_port = int(os.environ.get("SERVICE_PORT", 5000))
+    api_key = os.environ.get("REGISTRATION_API_KEY")
+    
+    url = f"http://{registry_ip}/register"
+    payload = {
+        "name": service_name,
+        "ip": service_ip,
+        "port": service_port,
+        "scheme": "http"
+    }
+    
+    logging.info(f"Attempting reverse proxy registration for service '{service_name}' at {service_ip}:{service_port} with registry {url}...")
+    
+    try:
+        data = json.dumps(payload).encode('utf-8')
+        headers = {'Content-Type': 'application/json'}
+        if api_key:
+            headers['X-API-Key'] = api_key
+            
+        req = urllib.request.Request(url, data=data, headers=headers, method='POST')
+        with urllib.request.urlopen(req, timeout=3.0) as response:
+            status_code = response.getcode()
+            response_body = response.read().decode('utf-8')
+            logging.info(f"Service registered successfully. Status: {status_code}, Response: {response_body}")
+            _registered = True
+    except Exception as e:
+        logging.warning(f"Failed to register service with reverse proxy: {str(e)}")
+
+def deregister_service():
+    global _registered, _unregistered
+    if not _registered or _unregistered:
+        return
+    _unregistered = True
+    
+    registry_ip = os.environ.get("REGISTRY_IP", "10.0.0.192")
+    service_name = os.environ.get("SERVICE_NAME", get_default_service_name())
+    api_key = os.environ.get("REGISTRATION_API_KEY")
+    
+    url = f"http://{registry_ip}/unregister"
+    payload = {
+        "name": service_name
+    }
+    
+    logging.info(f"Attempting reverse proxy deregistration for service '{service_name}' from registry {url}...")
+    
+    try:
+        data = json.dumps(payload).encode('utf-8')
+        headers = {'Content-Type': 'application/json'}
+        if api_key:
+            headers['X-API-Key'] = api_key
+            
+        req = urllib.request.Request(url, data=data, headers=headers, method='POST')
+        with urllib.request.urlopen(req, timeout=3.0) as response:
+            status_code = response.getcode()
+            response_body = response.read().decode('utf-8')
+            logging.info(f"Service deregistered successfully. Status: {status_code}, Response: {response_body}")
+            _registered = False
+    except Exception as e:
+        logging.warning(f"Failed to deregister service from reverse proxy during shutdown: {str(e)}")
+
+def wait_and_register():
+    service_port = int(os.environ.get("SERVICE_PORT", 5000))
+    start_time = time.time()
+    port_open = False
+    while time.time() - start_time < 5.0:
+        try:
+            with socket.create_connection(("127.0.0.1", service_port), timeout=0.5):
+                port_open = True
+                break
+        except (OSError, ConnectionRefusedError):
+            time.sleep(0.1)
+            
+    if port_open:
+        logging.info(f"Port {service_port} is active. Registering service.")
+        register_service()
+    else:
+        logging.warning(f"Timed out waiting for port {service_port} to start listening. Attempting registration anyway.")
+        register_service()
+
+def setup_lifecycle_hooks(use_reloader=True):
+    # Signal handling for termination
+    def handle_shutdown_signal(signum, frame):
+        logging.info(f"Process received signal {signum}. Triggering graceful deregistration hook...")
+        deregister_service()
+        sys.exit(0)
+
+    try:
+        signal.signal(signal.SIGINT, handle_shutdown_signal)
+        signal.signal(signal.SIGTERM, handle_shutdown_signal)
+        logging.info("Lifecycle hooks signal handlers registered.")
+    except ValueError as ve:
+        logging.warning(f"Failed to register signal handlers (must run on main thread): {str(ve)}")
+
+    # atexit registration
+    atexit.register(deregister_service)
+    logging.info("Lifecycle hooks atexit handler registered.")
+
+    # Non-blocking async registration thread
+    # Run if debug is off, if the reloader is disabled, or if we are the reloader's main runner process
+    is_server_process = (not app.debug) or (not use_reloader) or (os.environ.get("WERKZEUG_RUN_MAIN") == "true")
+    if is_server_process:
+        logging.info("Starting background thread for service registration...")
+        t = threading.Thread(target=wait_and_register, daemon=True)
+        t.start()
 
 # Size limit: 5MB maximum file upload to prevent DoS attacks.
 MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
@@ -800,4 +979,13 @@ if __name__ == "__main__":
     # TODO(security): Binding to 0.0.0.0 (all interfaces) to enable discoverability and management by locally connected systems.
     # Ensure local network firewall restricts unauthorized incoming connections in staging/production deployments.
     logging.info("Starting discoverable model tuning application server on all interfaces...")
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    
+    # Configure and run lifecycle hooks
+    debug_mode = os.environ.get("FLASK_DEBUG", "True").lower() in ("true", "1")
+    use_reloader = os.environ.get("FLASK_USE_RELOADER", "True").lower() in ("true", "1")
+    
+    app.debug = debug_mode
+    setup_lifecycle_hooks(use_reloader=use_reloader)
+    
+    port = int(os.environ.get("SERVICE_PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=debug_mode, use_reloader=use_reloader)

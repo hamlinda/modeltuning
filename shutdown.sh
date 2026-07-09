@@ -49,11 +49,12 @@ if [ -f "$PID_FILE" ]; then
     rm -f "$PID_FILE"
 fi
 
-# Method 2: Check port 5000 as a backup fallback
+# Method 2: Check port as a backup fallback
+TARGET_PORT=${SERVICE_PORT:-5000}
 if command -v lsof &> /dev/null; then
-    PORT_PIDS=$(lsof -t -i:5000 2>/dev/null)
+    PORT_PIDS=$(lsof -t -i:$TARGET_PORT 2>/dev/null)
     if [ -n "$PORT_PIDS" ]; then
-        echo -e "${BLUE}Found processes listening on port 5000...${NC}"
+        echo -e "${BLUE}Found processes listening on port $TARGET_PORT...${NC}"
         for PORT_PID in $PORT_PIDS; do
             echo -e "${YELLOW}Stopping process $PORT_PID...${NC}"
             kill "$PORT_PID" 2>/dev/null
@@ -62,7 +63,7 @@ if command -v lsof &> /dev/null; then
                 kill -9 "$PORT_PID" 2>/dev/null
             fi
         done
-        echo -e "${GREEN}${BOLD}✓ Port 5000 cleared.${NC}"
+        echo -e "${GREEN}${BOLD}✓ Port $TARGET_PORT cleared.${NC}"
         STOPPED=true
     fi
 fi
@@ -70,5 +71,5 @@ fi
 if [ "$STOPPED" = true ]; then
     echo -e "${GREEN}${BOLD}✓ Service shutdown completed.${NC}"
 else
-    echo -e "${YELLOW}No running application or service on port 5000 could be found.${NC}"
+    echo -e "${YELLOW}No running application or service on port $TARGET_PORT could be found.${NC}"
 fi
